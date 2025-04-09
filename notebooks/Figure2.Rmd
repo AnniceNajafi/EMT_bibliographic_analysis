@@ -1,0 +1,137 @@
+---
+title: "Figure 2"
+output: html_notebook
+---
+
+The below notebook demonstrates how Figure 2 subplots a and c were generated in the manuscript. We note that Figure 2 subplot B was generated through the Bibliometrix package in R. 
+
+
+```{r}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(maps)
+library(viridis)
+library(tidyr)
+
+
+df <- df %>% 
+  mutate(
+    affil_corr = str_extract(Affiliation, "^(.*?\\(Corresponding Author\\)[^\\.]*\\.)")
+  )
+
+df <- df %>%
+  mutate(
+    raw_country = str_trim(sub(".*,(.*)$", "\\1", affil_corr))
+  )
+
+
+unify_country <- function(x) {
+ 
+  x <- str_trim(x)
+  x <- sub("\\.$", "", x)
+  if(x == "" || is.na(x)) return("UNKNOWN")
+  
+  x_lower <- tolower(x)
+  if (grepl("usa|united states", x_lower)) {
+    return("USA")
+  } else if (grepl("peoples r china|china|hong kong|macau", x_lower)) {
+    return("CHINA")
+  } else if (grepl("south korea", x_lower)) {
+    return("SOUTH KOREA")
+  } else if (grepl("united kingdom|england|scotland|wales|uk", x_lower)) {
+    return("UNITED KINGDOM")
+  } else if (grepl("japan", x_lower)) {
+    return("JAPAN")
+  } else if (grepl("germany", x_lower)) {
+    return("GERMANY")
+  } else if (grepl("italy", x_lower)) {
+    return("ITALY")
+  } else if (grepl("spain", x_lower)) {
+    return("SPAIN")
+  } else if (grepl("taiwan", x_lower)) {
+    return("TAIWAN")
+  } else if (grepl("south africa", x_lower)) {
+    return("SOUTH AFRICA")
+  } else if (grepl("ukraine", x_lower)) {
+    return("UKRAINE")
+  } else if (grepl("peru", x_lower)) {
+    return("PERU")
+  } else if (grepl("mexico", x_lower)) {
+    return("MEXICO")
+  } else {
+   
+    return(toupper(x))
+  }
+}
+
+df <- df %>%
+  mutate(Country_clean = sapply(raw_country, unify_country))
+
+
+
+pub_counts <- df %>%
+  group_by(Country_clean) %>%
+  summarize(Frequency = n()) %>%
+  ungroup() %>%
+  rename(region = Country_clean)
+
+
+world_map <- map_data("world") %>%
+  mutate(region = toupper(region)) %>%
+  mutate(region = case_when(
+    region %in% c("UNITED STATES OF AMERICA", "USA") ~ "USA",
+    region %in% c("UK", "UNITED KINGDOM") ~ "UNITED KINGDOM",
+    region == "KOREA, SOUTH" ~ "SOUTH KOREA",
+    TRUE ~ region
+  ))
+
+pub_counts <- pub_counts %>% mutate(region = toupper(region))
+
+map_data_final <- left_join(world_map, pub_counts, by = "region")
+
+
+ggplot(map_data_final, aes(x = long, y = lat, group = group, fill = log10(Frequency + 1))) +
+  geom_polygon(color = "white") +
+  scale_fill_viridis_c(option = "plasma", name = "Log(Number of Papers+1)", na.value = "lightgray") +
+  labs(title = "Total Number of EMT Publications by Country\n(Extracted from Corresponding Author Affiliations)") +
+  theme_minimal() +
+  theme(
+    axis.text  = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank()
+  )
+
+```
+
+
+Citation counts
+
+```{r}
+
+citation_counts <- df %>%
+  filter(!is.na(Country_clean)) %>%
+  group_by(Country_clean) %>%
+  summarize(Total_Citations = sum(Times.Cited, na.rm = TRUE),
+            Num_Articles = n()) %>%
+  ungroup()
+
+
+print(citation_counts)
+
+
+ggplot(citation_counts, aes(x = reorder(Country_clean, Total_Citations), y = Total_Citations)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Total Citations by Country",
+       x = "Country",
+       y = "Total Citations")
+
+```
+
+
+
+
+
+
+
