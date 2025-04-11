@@ -1,0 +1,177 @@
+---
+title: "Figure 3"
+output: html_notebook
+---
+
+
+
+```{r}
+library(ggplot2)
+library(SurprisalAnalysis)
+library(dplyr)
+library(tidyr)
+
+
+
+most_frequent_areas <- df %>%
+  filter(Year<=2024) %>%
+  group_by(Year, Research.Areas) %>%
+  separate_rows(Research.Areas, sep = ";\\s*") %>%
+  mutate(Research.Areas = str_replace_all(Research.Areas, "\\\\&", "&")) %>%
+  mutate(Research.Areas = str_trim(Research.Areas)) %>%
+  count(Research.Areas, sort = TRUE)
+
+
+
+top_research_areas <- most_frequent_areas %>%
+  group_by(Research.Areas) %>%
+  summarise(Total_Publications = sum(n), .groups = "drop") %>%
+  arrange(desc(Total_Publications)) %>% 
+  slice_head(n = 20) 
+
+most_frequent_areas_filtered <- most_frequent_areas %>% filter(Research.Areas %in% top_research_areas$Research.Areas[1:10])
+
+most_frequent_areas_filtered <- most_frequent_areas #%>% filter(Research.Areas %in% top_research_areas$Research.Areas[1:10])
+
+
+trend_data <- most_frequent_areas_filtered  %>%
+  group_by(Year, Research.Areas) %>%
+  summarise(Publications = n(), .groups = "drop") 
+
+
+# ggplot(most_frequent_areas_filtered, aes(x = Year, y = n, color =Research.Areas, group = Research.Areas)) +
+#   geom_line(size=1) +
+#   geom_point(shape=8, stroke=0.5) +
+#   labs(
+#     tag="A",
+#     title = "Publication Trends Over Time",
+#     x = "Year",
+#     y = "Number of Publications",
+#     color = "Research Areas"
+#   ) +
+#   theme(
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     panel.background = element_blank(),
+#     axis.line = element_line(colour = "black"),
+#     plot.title = element_text(hjust = 0.5, size = 20),
+#     axis.text = element_text(size = 15),
+#     text = element_text(size = 18)
+#   )+scale_color_manual(values=c("#3B1C32", "#003161", "#740938", "#9B7EBD", 
+#                                 "#B9E5E8", "#8ABFA3", "#E4B1F0", "#EECAD5", "#1A3636",
+#                                 "#405D72"))
+
+
+```
+
+
+```{r]}
+reshaped_data <- trend_data %>%
+  pivot_wider(
+    names_from = Year,
+    values_from = Publications,
+    values_fill = 0
+  )
+
+
+
+reshaped_data <- as.matrix(reshaped_data)
+
+reshaped_data[,1]->rownames(reshaped_data)
+
+reshaped_data <- reshaped_data[,2:ncol(reshaped_data)]
+
+reshaped_numeric_data <- apply(reshaped_data, 2, as.numeric)
+
+rownames(reshaped_numeric_data) <- rownames(reshaped_data)
+
+
+
+sur.results <- surprisal_analysis(reshaped_numeric_data)
+
+
+
+lambdas <- sur.results[[1]]
+
+
+weights.categories <- sur.results[[2]]
+
+ggplot()+
+  geom_line(aes(x = seq(1991, 2024, 1), y=lambdas[,2]), size=1, color= "#D96098")+
+  geom_point(aes(x = seq(1991, 2024, 1), y=lambdas[,2]), shape=8, stroke=1, color= "#D96098")+
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(hjust = 0.5, size = 20),
+    axis.text = element_text(size = 15),
+    text = element_text(size = 18)
+  )+geom_hline(yintercept = 0, linetype='dashed')+
+  labs(x = 'Year', y=TeX("$\\lambda_1$"))
+
+
+
+ggplot()+
+  geom_line(aes(x = seq(1991, 2024, 1), y=lambdas[,3]), size=1, color= "#D96098")+
+  geom_point(aes(x = seq(1991, 2024, 1), y=lambdas[,3]), shape=8, stroke=1, color= "#D96098")+
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(hjust = 0.5, size = 20),
+    axis.text = element_text(size = 15),
+    text = element_text(size = 18)
+  )+geom_hline(yintercept = 0, linetype='dashed')+
+  labs(x = 'Year', y=TeX("$\\lambda_2$"))
+
+```
+
+
+```{r}
+ggplot() +
+  geom_density(aes(weights.categories[,2], colour = "$\\lambda_1$"), alpha = 0.4, size = 1.5) +
+  geom_density(aes(weights.categories[,3], colour = "$\\lambda_2$"), alpha = 0.4, size = 1.5) +
+  labs(x = "Weight", y = "Density", title = "Distribution of Weights", colour="Pattern") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(hjust = 0.5, size = 20),
+    axis.text = element_text(size = 15),
+    text = element_text(size = 18)
+  ) +
+  scale_color_manual(
+    values = c("$\\lambda_1$" = "#201E43", "$\\lambda_2$" = "#5F6F65"),
+    labels = c(TeX("$\\lambda_1$"), TeX("$\\lambda_2$"))
+  )
+```
+
+
+Check out the evolution of each category using the code below:
+
+```{r}
+ggplot(most_frequent_areas_filtered %>% filter(Research.Areas == "Research & Experimental Medicine"), aes(x = Year, y = n, color =Research.Areas, group = Research.Areas)) +
+  geom_line(size=1) +
+  geom_point(shape=8, stroke=0.5) +
+  labs(
+    tag="A",
+    title = "Publication Trends Over Time",
+    x = "Year",
+    y = "Number of Publications",
+    color = "Research Areas"
+  ) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.title = element_text(hjust = 0.5, size = 20),
+    axis.text = element_text(size = 15),
+    text = element_text(size = 18)
+  )+xlim(c(1991, 2024))
+
+```
+
