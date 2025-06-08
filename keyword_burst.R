@@ -1,5 +1,5 @@
 #' Authors@R: person("Annice", "Najafi", email = "annicenajafi27@gmail.com")
-#' The following program can be used to generate figure 1 subplots
+#' The following program can be used to generate figure 4 subplots
 #' 
 #' 
 #' Spring 2025, 
